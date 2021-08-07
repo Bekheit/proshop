@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { PayPalButton } from 'react-paypal-button-v2'
-import {  Col, Row, ListGroup, Image, Card } from 'react-bootstrap'
+import {  Col, Row, ListGroup, Image, Card, Button } from 'react-bootstrap'
 import { Link } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { getOrderDetails, payOrder } from '../actions/orderActions'
+import { deliverOrder, getOrderDetails, payOrder } from '../actions/orderActions'
 import Message from '../components/Message'
 import Loader from '../components/Loader'
-import { ORDER_PAY_RESET } from '../constants/orderConstants'
+import { ORDER_DELIVER_RESET, ORDER_PAY_RESET } from '../constants/orderConstants'
 
 const OrderScreen = ({ match }) => {
 
@@ -17,11 +17,17 @@ const OrderScreen = ({ match }) => {
 
   const [sdkReady, setSdkReady] = useState(false)
 
+  const userLogin = useSelector(state => state.userLogin)
+  const { userInfo } = userLogin
+
   const orderDetails = useSelector(state => state.orderDetails)
   const { order, loading, error } = orderDetails
 
   const orderPay = useSelector(state => state.orderPay)
   const { success: successPay, loading: loadingPay } = orderPay
+
+  const orderDeliver = useSelector(state => state.orderDeliver)
+  const { success: successDeliver, loading: loadingDeliver } = orderDeliver
 
   useEffect(() => {
   
@@ -37,8 +43,9 @@ const OrderScreen = ({ match }) => {
       document.body.appendChild(script)
     }
 
-    if(!order || successPay) {
+    if(!order || successPay || successDeliver) {
         dispatch({ type: ORDER_PAY_RESET })
+        dispatch({ type: ORDER_DELIVER_RESET })
         dispatch(getOrderDetails(orderId))
       } else if (!order.isPaid) {
         if(!window.paypal) {
@@ -48,11 +55,15 @@ const OrderScreen = ({ match }) => {
       }
     }
 
-  }, [dispatch, orderId, successPay, order])
+  }, [dispatch, orderId, successPay, order, successDeliver])
 
   const successPaymentHandler = (paymentResult) => {
     console.log(paymentResult)
     dispatch(payOrder(orderId, paymentResult))
+  }
+
+  const deliverHandler = () => {
+    dispatch(deliverOrder(orderId))
   }
 
   
@@ -144,36 +155,24 @@ const OrderScreen = ({ match }) => {
                 <ListGroup.Item>
                   {loadingPay && <Loader />}
                   {!sdkReady ? <Loader /> : (
-                    // <PayPal />
                     <PayPalButton
-                      // options={{
-                      //   // clientId:"AZkmb1IVYsQHU_Hbc5dWQDtaKrKwFXSw7A4iYDT-Fyk5i4JK7SUfJC2oe8XuMsGnkOdph2elzC2ltduj",
-                      //   currency: "EUR"
-                      // }}
                       amount={order.totalPrice}
                       onSuccess={successPaymentHandler}
                       onError={(err) => {console.log(err)}}
                     />
-
-                    // <PayPalButton 
-                    //   createOrder={(data, actions) => {
-                    //     return actions.order.create({
-                    //       purchase_units: [
-                    //         {
-                    //           amount: {
-                    //             value: order.totalPrice
-                    //           },
-                    //         },
-                    //       ],
-                    //     })
-                    //   }}
-
-                    //   onApprove={(data, actions) => {
-                    //     console.log(actions.order.capture())
-                    //     return actions.order.capture()
-                    //   }}
-                    // />
                   )}
+                </ListGroup.Item>
+              )}
+              {loadingDeliver && <Loader />}
+              {userInfo.isAdmin && order.isPaid && !order.isDelivered && (
+                <ListGroup.Item>
+                  <Button 
+                    type='button' 
+                    className='btn-block'
+                    onClick={deliverHandler}
+                  >
+                    Mark As Delivered
+                  </Button>
                 </ListGroup.Item>
               )}
             </ListGroup>
